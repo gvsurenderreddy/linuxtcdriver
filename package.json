@@ -1,0 +1,28 @@
+{
+	"name": "linuxtcdriver",
+	"description": "Linux Traffic Control (TC) utility wrapper ",
+	"version": "0.0.1",
+	"author": "Suresh Kumar",	
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/sureshkvl/linuxtcdriver.git"
+	},
+	"keywords": ["linux", "traffic","tc","qdisc","latency"],
+	"dependencies": {	
+	},
+	"devDependencies": {
+		"coffee-script": ">=1.9"
+	},
+	"config":{
+		"debianpackages":["iproute2"]	
+	},
+	"main": "./lib/tc",
+	"license": "MIT",
+	"homepage": "http://kaanalnet.org",
+	"scripts": {		
+		"start": "nodejs lib/tc.js"		
+	},
+	"contributors": [
+		""	
+	]
+}
