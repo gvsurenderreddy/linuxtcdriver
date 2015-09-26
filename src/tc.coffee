@@ -26,6 +26,15 @@ execute = (command, callback) ->
         else
             callback true    
 
+delLink = (ifname,callback)->
+    command = "ip link delete #{ifname}"        
+    util.log "executing #{command}..."
+    execute command, (result) =>        
+        if result instanceof Error
+             callback(false) 
+        else
+            callback(false)
+
 class tcqdisc
     constructor : (ifname,data)->
         @interface = ifname
@@ -58,9 +67,10 @@ class tcqdisc
             console.log "Netem case"
             console.log "Netem bandwidth : #{@config.bandwidth} latency: #{@config.latency} jitter: #{@config.jitter}  packetloss : #{@config.pktloss} "
             command = "tc qdisc add dev #{@interface} root handle 1:0 netem delay #{@config.latency} "
+            command += " #{@config.jitter}" if @config.jitter?
+            command  += " loss #{@config.pktloss} " if @config.pktloss?
             cmd1 = "tc qdisc add dev #{@interface} parent 1:1 handle 10: tbf rate  #{@config.bandwidth} buffer 1600 limit 3000"
-            cmd1 += " #{@config.jitter}" if @config.jitter?
-            cmd1  += " loss #{@config.pktloss} " if @config.pktloss?
+           
             execute command,(result)->
                 console.log "create result ", result
                 execute cmd1,(result)->
@@ -79,8 +89,9 @@ class tcqdisc
 
     stats: ()->
 
-
-
+module.exports = tcqdisc
+module.exports .delLink = delLink
+###
 config =
     bandwidth : "1mbit"
     latency : "10ms"
@@ -92,4 +103,4 @@ config =
 tcobj = new tcqdisc "virbr0", config
 tcobj.create()
 #console.log tcobj.get()
-
+###
