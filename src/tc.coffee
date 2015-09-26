@@ -31,39 +31,43 @@ class tcqdisc
         @interface = ifname
         @config = extend {}, data   
         @config.bandwidth ?= "100mbit"
-        @config.latency ?= "0ms"
-        @config.jitter ?= "0ms"
-        @config.pktloss ?= "0%"
+        #@config.latency ?= "0ms"
+        #@config.jitter ?= "0ms"
+        #@config.pktloss ?= "0%"
 
         console.log "tcqdisc object created with " + JSON.stringify @config
 
-    create : ()->
-        if @config.latency is "0ms" and @config.jitter is "0ms" and @config.pktloss is "0%"
-            #no netem only bandwidth
-            #tc qdisc add dev eth0 root tbf rate 1mbit burst 10kb latency 0.0001ms
+    create: ()->
+        # identify htb+netem to be used or only htb
+        #only bandwidth 
+        if not @config.latency? and not @config.jitter? and not @config.pktloss?
+            console.log "HTB case - only bandwidth"
+            console.log "HTB0 bandwidth : #{@config.bandwidth} latency: #{@config.latency} jitter: #{@config.jitter}  packetloss : #{@config.pktloss} "
             command = "tc qdisc add dev #{@interface} root tbf rate #{@config.bandwidth} burst 100kb latency 0.001ms"
-            console.log "command is ", command
             execute command,(result)->
                 console.log "create result ", result
-
-        else 
-            #netem params included 
-            cmd = ""
-            cmd += "tc qdisc add dev #{@interface} root handle 1:0 netem delay #{@config.latency} " if @config.latency isnt "0ms"
-            cmd += " #{@config.jitter} " if @config.jtter isnt "0ms"
-            cmd += " loss #{@config.pktloss} " if @config.pktloss isnt "0%"
-            console.log "command is ", cmd
-
+                ###
+        else if @config.latency? and not @config.jitter? and not @config.pktloss?
+            console.log "HTB Case bandwidth and delay"
+            console.log "HTB1 bandwidth : #{@config.bandwidth} latency: #{@config.latency} jitter: #{@config.jitter}  packetloss : #{@config.pktloss} "
+            command = "tc qdisc add dev #{@interface} root tbf rate #{@config.bandwidth} burst 100kb latency #{@config.latency}"
+            execute command,(result)->
+                console.log "create result ", result
+        ###
+        else
+            console.log "Netem case"
+            console.log "Netem bandwidth : #{@config.bandwidth} latency: #{@config.latency} jitter: #{@config.jitter}  packetloss : #{@config.pktloss} "
+            command = "tc qdisc add dev #{@interface} root handle 1:0 netem delay #{@config.latency} "
             cmd1 = "tc qdisc add dev #{@interface} parent 1:1 handle 10: tbf rate  #{@config.bandwidth} buffer 1600 limit 3000"
-            
-
-            execute cmd,(result)->
-                console.log "create cmd result ", result
-                console.log "command1 is ", cmd1
+            cmd1 += " #{@config.jitter}" if @config.jitter?
+            cmd1  += " loss #{@config.pktloss} " if @config.pktloss?
+            execute command,(result)->
+                console.log "create result ", result
                 execute cmd1,(result)->
-                    console.log "create cmd1 result ", result
+                    console.log "create result ", result
 
     get : ()->
+        interface : @interface
         config : @config
         stats:  null
     
@@ -80,12 +84,12 @@ class tcqdisc
 config =
     bandwidth : "1mbit"
     latency : "10ms"
-    jitter : "0.1ms"
-    pktloss : "0.1%"
+    #jitter : "0.1ms"
+    #pktloss : "0.1%"
 
 
 
-tcobj = new tcqdisc "eth0", config
+tcobj = new tcqdisc "virbr0", config
 tcobj.create()
-console.log tcobj.get()
+#console.log tcobj.get()
 
