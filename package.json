@@ -1,7 +1,7 @@
 {
 	"name": "linuxtcdriver",
 	"description": "Linux Traffic Control (TC) utility wrapper ",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"author": "Suresh Kumar",	
 	"repository": {
 		"type": "git",
@@ -9,6 +9,7 @@
 	},
 	"keywords": ["linux", "traffic","tc","qdisc","latency"],
 	"dependencies": {	
+		"async":"1.4.2"
 	},
 	"devDependencies": {
 		"coffee-script": ">=1.9"

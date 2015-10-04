@@ -2,7 +2,7 @@ util = require 'util'
 exec = require('child_process').exec
 fs = require('fs')
 extend = require('util')._extend
-
+async = require 'async'
 
 Schema =
     name: "tcqdisc"
@@ -39,47 +39,54 @@ class tcqdisc
     constructor : (ifname,data)->
         @interface = ifname
         @config = extend {}, data   
+        @stats = {}
         @config.bandwidth ?= "100mbit"
-        #@config.latency ?= "0ms"
-        #@config.jitter ?= "0ms"
-        #@config.pktloss ?= "0%"
-
+        @commands = []
         console.log "tcqdisc object created with " + JSON.stringify @config
-
-    create: ()->
-        # identify htb+netem to be used or only htb
         #only bandwidth 
+        @commands = []
         if not @config.latency? and not @config.jitter? and not @config.pktloss?
             console.log "HTB case - only bandwidth"
             console.log "HTB0 bandwidth : #{@config.bandwidth} latency: #{@config.latency} jitter: #{@config.jitter}  packetloss : #{@config.pktloss} "
             command = "tc qdisc add dev #{@interface} root tbf rate #{@config.bandwidth} burst 100kb latency 0.001ms"
-            execute command,(result)->
-                console.log "create result ", result
-                ###
-        else if @config.latency? and not @config.jitter? and not @config.pktloss?
-            console.log "HTB Case bandwidth and delay"
-            console.log "HTB1 bandwidth : #{@config.bandwidth} latency: #{@config.latency} jitter: #{@config.jitter}  packetloss : #{@config.pktloss} "
-            command = "tc qdisc add dev #{@interface} root tbf rate #{@config.bandwidth} burst 100kb latency #{@config.latency}"
-            execute command,(result)->
-                console.log "create result ", result
-        ###
+            @commands.push command
+            #execute command,(result)->
+            #    console.log "create result ", result
         else
             console.log "Netem case"
             console.log "Netem bandwidth : #{@config.bandwidth} latency: #{@config.latency} jitter: #{@config.jitter}  packetloss : #{@config.pktloss} "
             command = "tc qdisc add dev #{@interface} root handle 1:0 netem delay #{@config.latency} "
             command += " #{@config.jitter}" if @config.jitter?
             command  += " loss #{@config.pktloss} " if @config.pktloss?
+            @commands.push command
             cmd1 = "tc qdisc add dev #{@interface} parent 1:1 handle 10: tbf rate  #{@config.bandwidth} buffer 1600 limit 3000"
-           
-            execute command,(result)->
+            @commands.push cmd1
+            #execute command,(result)->
+            #    console.log "create result ", result
+            #    execute cmd1,(result)->
+            #        console.log "create result ", result
+    run : (cb)->
+        async.eachSeries @commands, (command,callback) =>        
+            execute command, (result)=>
                 console.log "create result ", result
-                execute cmd1,(result)->
-                    console.log "create result ", result
+                callback()            
+        ,(err) =>
+            if err
+                console.log "LinkConfig error occured " + JSON.stringify err
+                cb(false)
+            else
+                console.log "LinkConfig  all are processed "
+                cb (true)
+
+    #for backward compatibility keeping this
+    create: ()->
+        @run (cb)->
+            return cb
 
     get : ()->
         interface : @interface
         config : @config
-        stats:  null
+        stats:  @stats
     
     del: ()->
         cmd = "tc qdisc del dev #{@interface} root"
@@ -87,20 +94,48 @@ class tcqdisc
         execute cmd,(result)->
             console.log "delete cmd result ", result
 
-    stats: ()->
+    statistics: (callback)->
+        command = "tc -s qdisc show dev #{@interface}"
+        exec command, (error, stdout, stderr) =>
+            util.log "tcdriver: execute - Error : " + error
+            util.log "tcdriver: execute - stdout : " + stdout
+            util.log "tcdriver: execute - stderr : " + stderr
+            return callback error if error
+            result = stdout.toString()
+            tmparr = []
+            tmparr = result.split("\n")
+
+            if tmparr[3].search('qdisc tbf') isnt -1
+                tmp0 = tmparr[3].split(' ')
+                #console.log tmp0
+                tmp1 = tmparr[4].split(' ')
+                #console.log tmp1  
+                @stats.sentbytes = tmp1[2]
+                @stats.sentpackets = tmp1[4]
+                @stats.droppedpackets = tmp1[7]
+                #@stats.time = new Time
+                callback @stats
+            else
+                return callback new Error "error during stats colletion"
+
 
 module.exports = tcqdisc
 module.exports .delLink = delLink
-###
+
 config =
     bandwidth : "1mbit"
     latency : "10ms"
-    #jitter : "0.1ms"
-    #pktloss : "0.1%"
+    jitter : "0.1ms"
+    pktloss : "0.1%"
 
 
-
+###
 tcobj = new tcqdisc "virbr0", config
-tcobj.create()
-#console.log tcobj.get()
+console.log tcobj.commands
+tcobj.run (result)->
+    console.log "run ",result
+    tcobj.statistics (result)->
+        console.log "stats",result
+#tcobj.del()
+
 ###
