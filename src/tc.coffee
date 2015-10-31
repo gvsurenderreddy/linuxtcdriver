@@ -40,6 +40,8 @@ class tcqdisc
         @interface = ifname
         @config = extend {}, data   
         @stats = {}
+        @stats.tc = {}
+        @stats.ifconfig = {}
         @config.bandwidth ?= "100mbit"
         @commands = []
         console.log "tcqdisc object created with " + JSON.stringify @config
@@ -104,20 +106,39 @@ class tcqdisc
             result = stdout.toString()
             tmparr = []
             tmparr = result.split("\n")
+            return callback new Error "error during stats colletion" unless tmparr[3].search('qdisc tbf') isnt -1
+            tmp0 = tmparr[3].split(' ')
+            #console.log tmp0
+            tmp1 = tmparr[4].split(' ')
+            #console.log tmp1  
+            @stats.tc.sentbytes = tmp1[2]
+            @stats.tc.sentpackets = tmp1[4]
+            @stats.tc.droppedpackets = tmp1[7]
+            #@stats.time = new Time
+            # execute the iplink command
+            command = "ip -s link show #{@interface}"
+            exec command, (error, stdout, stderr) =>
+                util.log "tcdriver: execute - Error : " + error
+                util.log "tcdriver: execute - stdout : " + stdout
+                util.log "tcdriver: execute - stderr : " + stderr
+                return callback error if error
+                result = stdout.toString()
+                tmparr = []
+                tmparr = result.split("\n")
 
-            if tmparr[3].search('qdisc tbf') isnt -1
                 tmp0 = tmparr[3].split(' ')
-                #console.log tmp0
-                tmp1 = tmparr[4].split(' ')
-                #console.log tmp1  
-                @stats.sentbytes = tmp1[2]
-                @stats.sentpackets = tmp1[4]
-                @stats.droppedpackets = tmp1[7]
-                #@stats.time = new Time
+                console.log tmp0
+                tmp1 = tmparr[5].split(' ')
+                console.log tmp1
+                @stats.ifconfig.rxbytes = tmp0[1]
+                @stats.ifconfig.rxpackets = tmp0[2]
+                @stats.ifconfig.rxerrors = tmp0[3]
+                @stats.ifconfig.rxdropped = tmp0[4]
+                @stats.ifconfig.txbytes = tmp1[1]
+                @stats.ifconfig.txpackets = tmp[2]
+                @stats.ifconfig.txerrors = tmp1[3]
+                @stats.ifconfig.txdropped = tmp1[4]
                 callback @stats
-            else
-                return callback new Error "error during stats colletion"
-
 
 module.exports = tcqdisc
 module.exports .delLink = delLink
